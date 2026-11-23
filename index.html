@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>通電的電線對指北針的影響！</title>
+<style>
+  /* 基礎版面與響應式設定 */
+  body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: '微軟正黑體', sans-serif; overflow: hidden; background-color: #f4f4f9; user-select: none; }
+  .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+  .active-screen { display: flex; }
+
+  /* 隱藏的管理員按鈕 */
+  #admin-entry { position: absolute; top: 0; left: 0; width: 40px; height: 40px; background: transparent; cursor: pointer; border: none; outline: none; z-index: 1000; }
+
+  /* 初始畫面 */
+  .start-box { width: 90%; max-width: 700px; background: white; padding: 20px 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); text-align: center; }
+  .instructions { text-align: left; background: #eef; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 1.1em; line-height: 1.6; color: #333; }
+  input[type="text"] { width: 80%; padding: 12px; margin-bottom: 20px; font-size: 1.2em; border: 2px solid #ddd; border-radius: 8px; text-align: center; }
+  .mode-buttons { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }
+  .mode-btn { flex: 1; min-width: 30%; padding: 12px 5px; border: 2px solid #ccc; background: white; border-radius: 8px; font-size: 1em; cursor: pointer; transition: 0.2s; font-weight: bold; color: #555; }
+  .mode-btn.selected { border-color: #007bff; background: #e0f0ff; color: #0056b3; }
+  .start-btn { padding: 15px 50px; font-size: 1.5em; background: #28a745; color: white; border: none; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: transform 0.1s; font-weight: bold; }
+  .start-btn:active { transform: scale(0.95); }
+
+  /* 遊戲畫面 - 頂部資訊列 */
+  .top-bar { width: 100%; max-width: 800px; padding: 10px 20px; display: flex; justify-content: space-between; align-items: flex-start; box-sizing: border-box; font-weight: bold; z-index: 10; margin-top: 10px; }
+  .timer { font-size: 2em; color: #d32f2f; display: flex; align-items: center; gap: 5px; }
+  .hearts { font-size: 1.8em; letter-spacing: 5px; }
+  .score-container { display: flex; flex-direction: column; align-items: center; width: 50%; }
+  .score-box { font-size: 2.2em; color: #1976d2; }
+  
+  /* 彩虹時間條 */
+  .progress-wrap { width: 90%; max-width: 400px; height: 15px; border-radius: 10px; margin-top: 25px; position: relative; background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet); box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); overflow: hidden; }
+  .progress-mask { position: absolute; right: 0; top: 0; height: 100%; width: 0%; background: #f4f4f9; transition: width 0.1s linear; }
+
+  /* 遊戲畫面 - 題目區 (動態切換排版) */
+  .content-area { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0; padding: 10px 20px; box-sizing: border-box; gap: 20px; overflow: hidden; }
+  .question-img { border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; object-fit: contain; }
+  .question-text { font-weight: bold; text-align: center; color: #222; display: none; margin: 0; line-height: 1.4; }
+
+  /* 模式 1：圖片與文字並排顯示 */
+  .mode-1-layout { flex-direction: row; flex-wrap: wrap; align-content: center; }
+  .mode-1-layout .question-img { flex: 1 1 40%; max-width: 100%; max-height: 35vh; min-width: 240px; }
+  .mode-1-layout .question-text { flex: 1 1 40%; max-width: 100%; font-size: 1.4em; min-width: 240px; }
+
+  /* 模式 2：只有圖片 */
+  .mode-2-layout { flex-direction: column; }
+  .mode-2-layout .question-img { max-width: 90%; max-height: 40vh; }
+
+  /* 模式 3：只有文字 */
+  .mode-3-layout { flex-direction: column; }
+  .mode-3-layout .question-text { max-width: 90%; font-size: 1.8em; }
+
+  /* 遊戲畫面 - 十字按鈕區 */
+  .d-pad { display: grid; grid-template-columns: repeat(3, minmax(65px, 11vh)); grid-template-rows: repeat(3, minmax(65px, 11vh)); gap: 10px; justify-content: center; margin-bottom: 20px; padding-bottom: 10px; }
+  .d-btn { border: none; border-radius: 15px; font-size: 1.6em; font-weight: bold; cursor: pointer; box-shadow: 0 6px 0 rgba(0,0,0,0.15); transition: all 0.1s; position: relative; display: flex; align-items: center; justify-content: center; color: #333; }
+  .d-btn:active:not(:disabled) { transform: translateY(6px); box-shadow: 0 0 0 rgba(0,0,0,0.15); }
+  .d-btn:disabled { cursor: default; }
+  
+  .btn-n { grid-column: 2; grid-row: 1; background-color: #ffcccc; } /* 向北-淺紅 */
+  .btn-w { grid-column: 1; grid-row: 2; background-color: #ffffcc; } /* 向西-淺黃 */
+  .btn-e { grid-column: 3; grid-row: 2; background-color: #ccffcc; } /* 向東-淺綠 */
+  .btn-s { grid-column: 2; grid-row: 3; background-color: #ccccff; } /* 向南-淺藍 */
+  
+  .d-btn::after { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; pointer-events: none; z-index: 10; opacity: 0; transition: opacity 0.2s; }
+  .d-btn.correct::after { content: '⭕'; color: #00c853; text-shadow: 0 0 10px white; opacity: 1; }
+  .d-btn.wrong::after { content: '❌'; color: #d50000; text-shadow: 0 0 10px white; opacity: 1; }
+
+  /* 行動裝置進階保護 (防止螢幕過矮時重疊) */
+  @media (max-width: 600px), (max-height: 700px) {
+    .mode-1-layout .question-img { max-height: 25vh; min-width: 200px; }
+    .mode-1-layout .question-text { font-size: 1.2em; min-width: 200px; }
+    .d-pad { grid-template-columns: repeat(3, minmax(55px, 10vh)); grid-template-rows: repeat(3, minmax(55px, 10vh)); gap: 8px; margin-bottom: 10px; padding-bottom: 5px; }
+    .d-btn { font-size: 1.4em; border-radius: 12px; }
+  }
+
+  /* 結束畫面與證照 */
+  .cert-box { width: 90%; max-width: 650px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; border: 5px solid white; display: flex; flex-direction: column; max-height: 90vh; }
+  .cert-mode-1 { background-color: #FFFFE0; } /* 挑戰一：淺黃純色 */
+  .cert-mode-2 { background: linear-gradient(to bottom, #87CEEB, #E0F6FF); } /* 挑戰二：天空藍漸層 */
+  .cert-mode-3 { background: radial-gradient(circle, #FFD700, #DAA520); } /* 挑戰三：金色閃耀 */
+  .cert-title { font-size: 2.2em; font-weight: bold; margin-bottom: 5px; color: #333; }
+  .cert-name { font-size: 2em; margin: 10px 0; color: #b71c1c; font-weight: bold; }
+  .cert-score { font-size: 3.5em; font-weight: bold; color: #1565c0; margin: 5px 0; }
+  .cert-msg { font-size: 1.4em; margin-bottom: 15px; color: #222; font-weight: bold; }
+  .leaderboard { flex: 1; background: rgba(255,255,255,0.8); border-radius: 10px; padding: 15px; overflow-y: auto; text-align: left; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1); }
+  .leaderboard h3 { text-align: center; margin-top: 0; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+  .lb-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding: 8px 5px; font-size: 1.1em; color: #444; font-weight: bold; }
+  .restart-btn { margin-top: 20px; padding: 12px 40px; font-size: 1.4em; background: #ff9800; color: white; border: none; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); font-weight: bold; }
+  .restart-btn:active { transform: scale(0.95); }
+
+  /* 管理介面 */
+  .admin-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); width: 85%; max-width: 450px; }
+  .admin-box h2 { text-align: center; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+  .admin-field { margin-bottom: 20px; font-size: 1.2em; display: flex; justify-content: space-between; align-items: center; }
+  .admin-field input[type="number"] { width: 80px; padding: 8px; font-size: 1em; text-align: center; border: 1px solid #ccc; border-radius: 5px; }
+  .admin-radio { display: flex; gap: 15px; }
+  .admin-btns { display: flex; justify-content: space-between; gap: 15px; margin-top: 25px; }
+  .admin-btns button { flex: 1; padding: 12px; font-size: 1.2em; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; }
+  .save-admin { background: #007bff; color: white; }
+  .cancel-admin { background: #9e9e9e; color: white; }
+</style>
+</head>
+<body>
+
+  <!-- 隱藏管理員入口 -->
+  <button id="admin-entry" title="管理介面"></button>
+
+  <!-- 初始畫面 -->
+  <div id="start-screen" class="screen active-screen">
+    <div class="start-box">
+      <h1 style="color: #333; margin-top: 0;">遊戲說明</h1>
+      <div class="instructions">
+        1.先選擇挑戰關卡，[挑戰一]有圖片與文字題目；[挑戰二]只有圖片題目；[挑戰三]只有文字題目。<br>
+        2.進入遊戲後，根據題目，請選出指北針的指北端(N極)偏轉情形。
+      </div>
+      <input type="text" id="player-name" placeholder="請輸入您的名稱或暱稱" autocomplete="off" />
+      <div class="mode-buttons">
+        <button class="mode-btn selected" data-mode="1">[挑戰一]<br>圖片與文字</button>
+        <button class="mode-btn" data-mode="2">[挑戰二]<br>只有圖片</button>
+        <button class="mode-btn" data-mode="3">[挑戰三]<br>只有文字</button>
+      </div>
+      <button id="start-btn" class="start-btn">開始挑戰</button>
+    </div>
+  </div>
+
+  <!-- 遊戲畫面 -->
+  <div id="game-screen" class="screen">
+    <div class="top-bar">
+      <div class="timer">⏱️ <span id="timer-text">60</span></div>
+      <div class="score-container">
+        <div class="score-box" id="score-text">0</div>
+        <div class="progress-wrap">
+          <div class="progress-mask" id="time-bar-mask"></div>
+        </div>
+      </div>
+      <div class="hearts" id="hearts-text">❤️❤️❤️</div>
+    </div>
+
+    <!-- 題目區：增加了 id="content-area" 讓 JS 動態賦予排版 class -->
+    <div id="content-area" class="content-area mode-1-layout">
+      <img id="q-img" class="question-img" src="" alt="題目圖片" />
+      <div id="q-txt" class="question-text"></div>
+    </div>
+
+    <div class="d-pad">
+      <button class="d-btn btn-n" data-dir="向北">向北</button>
+      <button class="d-btn btn-w" data-dir="向西">向西</button>
+      <button class="d-btn btn-e" data-dir="向東">向東</button>
+      <button class="d-btn btn-s" data-dir="向南">向南</button>
+    </div>
+  </div>
+
+  <!-- 結束畫面 -->
+  <div id="game-over-screen" class="screen">
+    <div class="cert-box" id="cert-box">
+      <div class="cert-title">完成證照</div>
+      <div class="cert-name" id="cert-name"></div>
+      <div class="cert-score" id="cert-score">0 分</div>
+      <div class="cert-msg" id="cert-msg"></div>
+      
+      <div class="leaderboard">
+        <h3 id="lb-title">榮譽榜 (Top 10)</h3>
+        <div id="lb-list"></div>
+      </div>
+      
+      <div>
+        <button id="restart-btn" class="restart-btn">再次挑戰！</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理介面 -->
+  <div id="admin-screen" class="screen">
+    <div class="admin-box">
+      <h2>管理員設定</h2>
+      <div class="admin-field">
+        <label>遊戲總倒數 (秒):</label>
+        <input type="number" id="admin-overall-time" value="60" min="10" />
+      </div>
+      <div class="admin-field">
+        <label>每題思考時間 (秒):</label>
+        <input type="number" id="admin-q-time" value="10" min="3" />
+      </div>
+      <div class="admin-field" style="justify-content: flex-start; gap: 15px;">
+        <label>是否清空線上紀錄：</label>
+        <div class="admin-radio">
+          <label><input type="radio" name="clear-db" value="yes" id="admin-clear-yes"> 是</label>
+          <label><input type="radio" name="clear-db" value="no" id="admin-clear-no" checked> 否</label>
+        </div>
+      </div>
+      <div class="admin-btns">
+        <button id="admin-cancel" class="cancel-admin">取消</button>
+        <button id="admin-save" class="save-admin">確定修改</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  // ==========================================
+  // Firebase 設定區 (請將下方設定替換為您的專案設定)
+  // ==========================================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+  import { getDatabase, ref, push, onValue, remove, query } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+
+  const firebaseConfig = {};
+
+  let db = null;
+  try {
+    if(Object.keys(firebaseConfig).length > 0 && firebaseConfig.databaseURL) {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+    }
+  } catch(e) { console.warn("Firebase 未設定或發生錯誤，將採用本機儲存(localStorage)模式運行。"); }
+
+  // ==========================================
+  // 遊戲資料與狀態
+  // ==========================================
+  const questionsData = [
+    { id: 1, text: "電流由北向南，指北針在電線下方", img: "P421.jpg", answer: "向東" },
+    { id: 2, text: "電流由北向南，指北針在電線上方", img: "P422.jpg", answer: "向西" },
+    { id: 3, text: "電流由南向北，指北針在電線上方", img: "P423.jpg", answer: "向東" },
+    { id: 4, text: "電流由南向北，指北針在電線下方", img: "P424.jpg", answer: "向西" },
+    { id: 5, text: "電流由東向西，指北針在電線上方", img: "P425.jpg", answer: "向北" },
+    { id: 6, text: "電流由東向西，指北針在電線下方", img: "P426.jpg", answer: "向南" },
+    { id: 7, text: "電流由西向東，指北針在電線上方", img: "P427.jpg", answer: "向南" },
+    { id: 8, text: "電流由西向東，指北針在電線下方", img: "P428.jpg", answer: "向北" }
+  ];
+
+  let sysSettings = { overallTime: 60, qTime: 10 };
+  let state = {
+    name: "", mode: 1, score: 0, hearts: 3, timerLeft: 60,
+    currentQ: null, lastQId: null, isAnswering: false,
+    gameInterval: null, qStartNow: 0, qAnimReq: null
+  };
+
+  // ==========================================
+  // 音效合成 (不需外部音檔)
+  // ==========================================
+  let audioCtx = null;
+  function initAudio() {
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function playTone(type, startFreq, endFreq, duration) {
+    if(!audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+      if(endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + duration * 0.5);
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+  }
+  const soundCorrect = () => playTone('sine', 523.25, 1046.50, 0.4);
+  const soundWrong = () => playTone('sawtooth', 150, 100, 0.3);
+
+  // ==========================================
+  // UI 流程控制
+  // ==========================================
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+    document.getElementById(id).classList.add('active-screen');
+  }
+
+  // 選擇模式
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+      e.currentTarget.classList.add('selected');
+      state.mode = parseInt(e.currentTarget.getAttribute('data-mode'));
+    });
+  });
+
+  // 開始挑戰
+  document.getElementById('start-btn').addEventListener('click', () => {
+    const inputName = document.getElementById('player-name').value.trim();
+    if(!inputName) return alert("請輸入名稱或暱稱！");
+    state.name = inputName;
+    initAudio();
+    startGame();
+  });
+
+  function startGame() {
+    state.score = 0; state.hearts = 3; state.timerLeft = sysSettings.overallTime;
+    state.lastQId = null;
+    updateTopBar();
+    showScreen('game-screen');
+    
+    clearInterval(state.gameInterval);
+    state.gameInterval = setInterval(() => {
+      state.timerLeft--;
+      document.getElementById('timer-text').innerText = state.timerLeft;
+      if(state.timerLeft <= 0) endGame();
+    }, 1000);
+    
+    loadNextQuestion();
+  }
+
+  function loadNextQuestion() {
+    if(state.timerLeft <= 0 || state.hearts <= 0) return;
+    state.isAnswering = false;
+    
+    document.querySelectorAll('.d-btn').forEach(b => {
+      b.disabled = false;
+      b.classList.remove('correct', 'wrong');
+    });
+    document.getElementById('time-bar-mask').style.width = '0%';
+
+    let pool = questionsData.filter(q => q.id !== state.lastQId);
+    state.currentQ = pool[Math.floor(Math.random() * pool.length)];
+    state.lastQId = state.currentQ.id;
+
+    // 動態切換顯示區的排版 class
+    document.getElementById('content-area').className = 'content-area mode-' + state.mode + '-layout';
+
+    const imgEl = document.getElementById('q-img');
+    const txtEl = document.getElementById('q-txt');
+    imgEl.style.display = 'none'; txtEl.style.display = 'none';
+
+    if(state.mode === 1) { imgEl.src = state.currentQ.img; imgEl.style.display = 'block'; txtEl.innerText = state.currentQ.text; txtEl.style.display = 'block'; }
+    if(state.mode === 2) { imgEl.src = state.currentQ.img; imgEl.style.display = 'block'; }
+    if(state.mode === 3) { txtEl.innerText = state.currentQ.text; txtEl.style.display = 'block'; }
+
+    state.qStartNow = performance.now();
+    cancelAnimationFrame(state.qAnimReq);
+    state.qAnimReq = requestAnimationFrame(qTimerLoop);
+  }
+
+  // 時間條邏輯
+  function getScorePercentage(elapsedMS) {
+    let rawSec = elapsedMS / 1000;
+    let mappedSec = (rawSec / sysSettings.qTime) * 10; 
+    if(mappedSec > 10) mappedSec = 10;
+    
+    if(mappedSec <= 5) return 100 - (60 / 5) * mappedSec; 
+    if(mappedSec <= 8) return 40 - (30 / 3) * (mappedSec - 5); 
+    return 10 - (10 / 2) * (mappedSec - 8); 
+  }
+
+  function qTimerLoop(now) {
+    if(state.isAnswering) return;
+    let elapsed = now - state.qStartNow;
+    let remainPct = getScorePercentage(elapsed);
+    
+    document.getElementById('time-bar-mask').style.width = (100 - remainPct) + '%';
+
+    if(elapsed >= sysSettings.qTime * 1000) {
+      document.getElementById('time-bar-mask').style.width = '100%';
+      processAnswer(null); // 超時
+    } else {
+      state.qAnimReq = requestAnimationFrame(qTimerLoop);
+    }
+  }
+
+  // 作答處理
+  document.querySelectorAll('.d-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => { if(!state.isAnswering) processAnswer(e.currentTarget); });
+  });
+
+  function processAnswer(selectedBtn) {
+    state.isAnswering = true;
+    cancelAnimationFrame(state.qAnimReq);
+    document.querySelectorAll('.d-btn').forEach(b => b.disabled = true);
+
+    const correctAns = state.currentQ.answer;
+    const correctBtn = document.querySelector(`.d-btn[data-dir="${correctAns}"]`);
+    
+    if(selectedBtn && selectedBtn.getAttribute('data-dir') === correctAns) {
+      soundCorrect();
+      selectedBtn.classList.add('correct');
+      let elapsed = performance.now() - state.qStartNow;
+      let plusScore = Math.floor(250 * getScorePercentage(elapsed) / 100);
+      state.score += Math.max(0, plusScore);
+    } else {
+      soundWrong();
+      state.hearts--;
+      if(selectedBtn) selectedBtn.classList.add('wrong');
+      if(correctBtn) correctBtn.classList.add('correct'); // 持續顯示正確解答1秒
+    }
+    
+    updateTopBar();
+    setTimeout(() => { (state.hearts <= 0 || state.timerLeft <= 0) ? endGame() : loadNextQuestion(); }, 1000);
+  }
+
+  function updateTopBar() {
+    document.getElementById('timer-text').innerText = state.timerLeft;
+    document.getElementById('score-text').innerText = state.score;
+    document.getElementById('hearts-text').innerText = '❤️'.repeat(state.hearts) || '💔';
+  }
+
+  // ==========================================
+  // 遊戲結束與資料庫操作
+  // ==========================================
+  function endGame() {
+    clearInterval(state.gameInterval); cancelAnimationFrame(state.qAnimReq);
+    showScreen('game-over-screen');
+    
+    document.getElementById('cert-box').className = 'cert-box cert-mode-' + state.mode;
+    document.getElementById('cert-name').innerText = state.name;
+    document.getElementById('cert-score').innerText = state.score + " 分";
+    document.getElementById('cert-msg').innerText = (state.score >= 1000) ? "太棒了！你是電磁學專家！" : "再接再厲，下次會更好！";
+
+    uploadAndRenderLeaderboard();
+  }
+
+  async function uploadAndRenderLeaderboard() {
+    const listDOM = document.getElementById('lb-list');
+    listDOM.innerHTML = "<div style='text-align:center;'>資料同步中...</div>";
+    document.getElementById('lb-title').innerText = `挑戰${['一','二','三'][state.mode-1]}榮譽榜 (Top 10)`;
+
+    const nodePath = 'honor_board_mode_' + state.mode;
+    const newRecord = { name: state.name, score: state.score, time: Date.now() };
+
+    if(db) {
+      try {
+        const boardRef = ref(db, nodePath);
+        await push(boardRef, newRecord);
+        onValue(query(boardRef), (snapshot) => {
+          let dataArr = [];
+          snapshot.forEach(c => dataArr.push(c.val()));
+          renderList(dataArr);
+        }, { onlyOnce: true });
+      } catch(e) { fallbackLocalLeaderboard(nodePath, newRecord); }
+    } else {
+      fallbackLocalLeaderboard(nodePath, newRecord);
+    }
+  }
+
+  function fallbackLocalLeaderboard(nodePath, newRecord) {
+    let dataArr = JSON.parse(localStorage.getItem(nodePath) || "[]");
+    dataArr.push(newRecord);
+    localStorage.setItem(nodePath, JSON.stringify(dataArr));
+    renderList(dataArr);
+  }
+
+  function renderList(arr) {
+    arr.sort((a, b) => b.score - a.score);
+    const top10 = arr.slice(0, 10);
+    const listDOM = document.getElementById('lb-list');
+    listDOM.innerHTML = "";
+    if(top10.length === 0) listDOM.innerHTML = "<div class='lb-row'>尚無挑戰者紀錄</div>";
+    top10.forEach((r, idx) => {
+      listDOM.innerHTML += `<div class='lb-row'><span>#${idx+1} ${r.name}</span><span>${r.score} 分</span></div>`;
+    });
+  }
+
+  document.getElementById('restart-btn').addEventListener('click', () => showScreen('start-screen'));
+
+  // ==========================================
+  // 管理介面
+  // ==========================================
+  document.getElementById('admin-entry').addEventListener('click', () => {
+    let pwd = prompt("請輸入管理者密碼：");
+    if(pwd === "otwang2026") {
+      document.getElementById('admin-overall-time').value = sysSettings.overallTime;
+      document.getElementById('admin-q-time').value = sysSettings.qTime;
+      document.getElementById('admin-clear-no').checked = true;
+      showScreen('admin-screen');
+    } else if (pwd !== null) alert("密碼錯誤！");
+  });
+
+  document.getElementById('admin-cancel').addEventListener('click', () => showScreen('start-screen'));
+
+  document.getElementById('admin-save').addEventListener('click', async () => {
+    sysSettings.overallTime = parseInt(document.getElementById('admin-overall-time').value) || 60;
+    sysSettings.qTime = parseInt(document.getElementById('admin-q-time').value) || 10;
+    
+    if(document.getElementById('admin-clear-yes').checked) {
+      if(db) {
+        try {
+          await remove(ref(db, 'honor_board_mode_1'));
+          await remove(ref(db, 'honor_board_mode_2'));
+          await remove(ref(db, 'honor_board_mode_3'));
+          alert("線上紀錄已成功清空！");
+        } catch(e) { clearLocalDB(); alert("本機紀錄已清空 (無法連線線上資料庫)"); }
+      } else {
+        clearLocalDB(); alert("本機紀錄已清空！");
+      }
+    }
+    showScreen('start-screen');
+  });
+
+  function clearLocalDB() {
+    localStorage.removeItem('honor_board_mode_1');
+    localStorage.removeItem('honor_board_mode_2');
+    localStorage.removeItem('honor_board_mode_3');
+  }
+
+</script>
+</body>
+</html>
